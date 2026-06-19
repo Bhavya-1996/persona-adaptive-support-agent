@@ -1,13 +1,17 @@
-Security Handbook
+# Security Handbook
 
-Password Requirements
+Password Requirements:
 
-Minimum 8 characters.
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one number
 
-Account Protection
+Security Recommendations:
 
-Enable MFA.
+- Enable Multi-Factor Authentication
+- Never share credentials
+- Rotate passwords regularly
 
-Unauthorized Access
+Unauthorized Access:
 
-Contact support immediately.
+Immediately report suspicious account activity to support.
