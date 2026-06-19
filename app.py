@@ -1,5 +1,11 @@
 import streamlit as st
 
+from src.persona_detector import PersonaDetector
+from src.retriever import SupportRetriever
+from src.response_generator import ResponseGenerator
+from src.escalation import EscalationEngine
+from src.handoff import HandoffGenerator
+
 st.set_page_config(
     page_title="Persona Adaptive Support Agent",
     page_icon="🤖",
@@ -9,141 +15,141 @@ st.set_page_config(
 st.title("🤖 Persona-Adaptive Customer Support Agent")
 
 st.markdown("""
-This AI support assistant:
-- Detects customer persona
-- Retrieves support information
+This AI assistant:
+
+- Detects customer personas
+- Retrieves support documentation
 - Generates persona-aware responses
 - Escalates unresolved issues
+- Creates human handoff summaries
 """)
 
-user_query = st.text_area(
-    "Enter Customer Query",
-    placeholder="Describe your issue here..."
+query = st.text_area(
+    "Enter Customer Message",
+    height=150
 )
 
-if st.button("Analyze Query"):
+if st.button("Analyze"):
 
-    persona = "Technical Expert"
+    if not query.strip():
+        st.warning("Please enter a message.")
+        st.stop()
 
-    query = user_query.lower()
+    detector = PersonaDetector()
+    retriever = SupportRetriever()
+    generator = ResponseGenerator()
+    escalation_engine = EscalationEngine()
+    handoff_generator = HandoffGenerator()
 
-    if any(word in query for word in [
-        "frustrating",
-        "angry",
-        "nothing works",
-        "terrible",
-        "urgent"
-    ]):
-        persona = "Frustrated User"
+    # Persona Detection
 
-    elif any(word in query for word in [
-        "business",
-        "revenue",
-        "operations",
-        "customers",
-        "impact"
-    ]):
-        persona = "Business Executive"
+    persona_result = detector.detect(query)
+
+    persona = persona_result["persona"]
 
     st.subheader("Detected Persona")
+
     st.success(persona)
+
+    # Load Vector Database
+
+    try:
+        retriever.load_vector_store()
+    except:
+        retriever.create_vector_store()
+
+    # Retrieve Documents
+
+    docs = retriever.retrieve(
+        query,
+        k=3
+    )
 
     st.subheader("Retrieved Sources")
 
-    retrieved_sources = [
-        "api_authentication.md",
-        "login_troubleshooting.md"
-    ]
+    source_names = []
 
-    for source in retrieved_sources:
-        st.write(f"• {source}")
+    if docs:
+
+        for doc in docs:
+
+            source = doc.metadata.get(
+                "source",
+                "Unknown"
+            )
+
+            source_names.append(source)
+
+            st.write(f"• {source}")
+
+    else:
+
+        st.write("No sources found")
+
+    # Generate Response
+
+    response = generator.generate(
+        persona=persona,
+        query=query,
+        retrieved_docs=docs
+    )
 
     st.subheader("Generated Response")
 
-    if persona == "Technical Expert":
-        st.info("""
-Root Cause Analysis:
+    st.info(response)
 
-The issue may be related to authentication
-token expiration or configuration mismatch.
+    # Escalation Check
 
-Troubleshooting Steps:
+    retrieval_score = 0.90
 
-1. Verify API token validity
-2. Check request headers
-3. Review application logs
-4. Retry authentication
-        """)
+    if len(docs) == 0:
+        retrieval_score = 0.0
 
-    elif persona == "Frustrated User":
-        st.info("""
-I understand how frustrating this can be.
-
-Let's try the following:
-
-1. Log out
-2. Clear browser cache
-3. Log in again
-
-If the issue continues,
-we can escalate it to support.
-        """)
-
-    else:
-        st.info("""
-Business Impact:
-
-The issue may affect normal operations.
-
-Recommended Action:
-
-Review system access and restore service.
-
-Estimated Resolution Time:
-
-15-30 minutes.
-        """)
+    escalation_result = (
+        escalation_engine.should_escalate(
+            query=query,
+            retrieval_score=retrieval_score,
+            failed_attempts=0,
+            docs_found=len(docs) > 0
+        )
+    )
 
     st.subheader("Escalation Status")
 
-    escalation = False
+    if escalation_result["escalate"]:
 
-    escalation_keywords = [
-        "refund",
-        "legal",
-        "lawsuit",
-        "hacked",
-        "unauthorized"
-    ]
+        st.error("Escalation Required")
 
-    if any(word in query for word in escalation_keywords):
-        escalation = True
+        st.write("Reasons:")
 
-    if escalation:
-        st.error("Escalated to Human Support")
-    else:
-        st.success("No Escalation Required")
-        
+        for reason in escalation_result["reasons"]:
+            st.write(f"- {reason}")
 
-    st.subheader("Human Handoff Summary")
+        summary = (
+            handoff_generator.create_summary(
+                persona=persona,
+                issue=query,
+                conversation_history=[
+                    query
+                ],
+                documents_used=source_names,
+                attempted_steps=[
+                    "Knowledge Base Retrieval",
+                    "AI Response Generation"
+                ],
+                recommendation=
+                    "Escalate to Tier-2 Support"
+            )
+        )
 
-    if escalation:
-        summary = {
-            "persona": persona,
-            "issue": user_query,
-            "documents_used": retrieved_sources,
-            "recommended_action":
-                "Review case by Tier-2 Support"
-        }
+        st.subheader(
+            "Human Handoff Summary"
+        )
 
         st.json(summary)
 
-from src.persona_detector import PersonaDetector
+    else:
 
-detector = PersonaDetector()
-
-result = detector.detect(
-    "Can you explain the API authentication failure?"
-)
-
-print(result)
+        st.success(
+            "No Escalation Required"
+        )
