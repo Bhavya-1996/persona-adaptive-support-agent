@@ -123,6 +123,7 @@ Estimated Resolution Time:
         st.error("Escalated to Human Support")
     else:
         st.success("No Escalation Required")
+        
 
     st.subheader("Human Handoff Summary")
 
@@ -136,3 +137,13 @@ Estimated Resolution Time:
         }
 
         st.json(summary)
+
+from src.persona_detector import PersonaDetector
+
+detector = PersonaDetector()
+
+result = detector.detect(
+    "Can you explain the API authentication failure?"
+)
+
+print(result)
